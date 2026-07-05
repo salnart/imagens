@@ -1,8 +1,20 @@
-# GPT Image Studio
+# Imagens
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-salnart%2Fimagens-181717?logo=github)](https://github.com/salnart/imagens)
 
-A self-hosted web application for AI image generation. Supports multiple AI providers with automatic failover, user management, and an intuitive admin panel.
+A self-hosted AI image generation platform with multi-provider failover, user management, and an intuitive admin panel. Deploy with Docker.
+
+<p align="center">
+  <img src="screenshot/1.png" width="45%" alt="Generate">
+  <img src="screenshot/2.png" width="45%" alt="Promts Panel">
+  <br>
+  <img src="screenshot/3.png" width="45%" alt="Promts Library">
+  <img src="screenshot/4.png" width="45%" alt="Image Editor">
+    <br>
+  <img src="screenshot/5.png" width="45%" alt="Admin Dashboard">
+  <img src="screenshot/6.png" width="45%" alt="Providers">
+</p>
 
 ---
 
