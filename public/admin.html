@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin - Imagens</title>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="/admin.css?v=7">
+  </head>
+  <body>
+    <div id="appShell" class="shell">
+      <aside id="sidebar" class="sidebar">
+        <div class="sidebar-header">
+          <a href="/" class="sidebar-brand">
+            <img src="/logo.png" alt="Imagens" style="width:24px;height:24px;border-radius:6px">
+            <span>Imagens</span>
+          </a>
+        </div>
+        <nav class="sidebar-nav" id="sidebarNav">
+          <button class="nav-item active" data-view="dashboard"><i class="ri-dashboard-3-line"></i><span>Dashboard</span></button>
+          <button class="nav-item" data-view="logs"><i class="ri-file-list-3-line"></i><span>Logs</span></button>
+          <button class="nav-item" data-view="users"><i class="ri-group-line"></i><span>Users</span></button>
+          <button class="nav-item" data-view="permissions"><i class="ri-settings-4-line"></i><span>Permissions</span></button>
+          <button class="nav-item" data-view="providers"><i class="ri-cloud-line"></i><span>Providers</span></button>
+        </nav>
+        <div class="sidebar-footer">
+          <a href="/" class="nav-item"><i class="ri-home-4-line"></i><span>Home</span></a>
+          <button id="logoutBtn" class="nav-item hidden"><i class="ri-logout-box-r-line"></i><span>Logout</span></button>
+        </div>
+      </aside>
+      <div class="main-area">
+        <header class="topbar" id="topbar">
+          <button class="sidebar-toggle" id="sidebarToggle"><i class="ri-menu-line"></i></button>
+          <div class="topbar-title" id="topbarTitle">Dashboard</div>
+          <div class="topbar-actions"></div>
+        </header>
+        <main id="adminApp" class="content"></main>
+      </div>
+    </div>
+    <div id="toastLayer" class="toast-layer"></div>
+    <div id="modalLayer" class="modal-layer hidden"></div>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="/admin.js?v=7" defer></script>
+  </body>
+</html>

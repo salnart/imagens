@@ -1,0 +1,530 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Imagens</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@4.6.0/fonts/remixicon.min.css" rel="stylesheet" crossorigin="anonymous">
+    <link rel="stylesheet" href="/styles.css?v=7">
+    <link rel="stylesheet" href="/filerobot-bundle.css">
+  
+<style>
+body { background:#0f0f0f !important; color:#e5e5e5 !important; font-family:Geist,sans-serif !important;
+  background:radial-gradient(125% 125% at 50% 101%, rgba(180,60,30,0.5) 10%, rgba(200,80,20,0.4) 16%, rgba(200,100,30,0.3) 20%, rgba(180,130,80,0.2) 30%, rgba(160,120,140,0.2) 50%, rgba(100,140,180,0.15) 80%, rgba(20,20,30,1) 100%) !important;
+  background-attachment:fixed !important; }
+.app { background:transparent !important; display:flex !important; flex-direction:column !important; min-height:100vh !important; }
+.ambient, .hero-video-layer { display:none !important; }
+.hero { background:transparent !important; padding:10px !important; min-height:auto !important; flex:1 !important; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:flex-start !important; }
+.topbar { background:rgba(26,26,26,0.85) !important; backdrop-filter:blur(12px) !important; border-bottom:1px solid rgba(255,255,255,0.08) !important; padding:0 20px !important; height:52px !important; }
+.top-actions button, .nav-pill, .dark-pill, .icon-pill { background:transparent !important; border:none !important; border-radius:6px !important; color:#999 !important; font-size:13px !important; padding:6px 12px !important; height:32px !important; }
+.top-actions button:hover, .nav-pill:hover, .dark-pill:hover, .icon-pill:hover { background:rgba(255,255,255,0.08) !important; color:#e5e5e5 !important; }
+.composer { background:rgba(26,26,26,0.92) !important; backdrop-filter:blur(16px) !important; border:1px solid rgba(255,255,255,0.07) !important; border-radius:16px !important; padding:14px !important; box-shadow:0 8px 40px rgba(0,0,0,0.5) !important; max-width:1200px !important; width:calc(100% - 40px) !important; margin:0 auto !important; position:relative !important; overflow:hidden !important; }
+.composer-head { display:none !important; }
+.prompt-box { background:transparent !important; border:none !important; color:#e5e5e5 !important; font-size:13px !important; padding:11px 8px 8px !important; flex:1 !important; min-width:0 !important; font-family:inherit !important; }
+.composer-spacer { flex:0 !important; }
+.composer { padding:16.5px 14px !important; }
+.prompt-box::placeholder { color:#888 !important; }
+.advanced-options { display:flex !important; flex-wrap:wrap !important; gap:8px !important; padding:8px 0 0 !important; position:static !important; background:transparent !important; border:none !important; box-shadow:none !important; }
+.advanced-options label { margin:0 !important; font-size:13px !important; color:#999 !important; }
+.advanced-options select { background:#2a2a2a !important; color:#e5e5e5 !important; border:1px solid rgba(255,255,255,0.1) !important; border-radius:6px !important; padding:4px 8px !important; font-size:13px !important; }
+.card-art { position:relative !important; overflow:hidden !important; }
+.send-button { background:linear-gradient(135deg,#7c3aed,#a855f7) !important; color:#0f0f0f !important; border-radius:10px !important; font-weight:500 !important; padding:8px 20px !important; }
+.send-button:disabled { opacity:0.4 !important; }
+.gen-bar-wrap { position:absolute; bottom:0; left:0; right:0; height:2px; background:rgba(255,255,255,0.04); overflow:hidden; border-radius:0 0 16px 16px; }
+.gen-bar-fill { height:100%; width:0%; background:linear-gradient(90deg,#a855f7,#c084fc); transition:width .3s ease; }
+.gen-bar-wrap.active .gen-bar-fill { animation:genProgress 1.5s ease-in-out infinite; }
+@keyframes genProgress { 0%{width:5%;margin-left:0} 50%{width:60%;margin-left:30%} 100%{width:5%;margin-left:95%} }
+.brand-btn { background:transparent !important; border:none !important; font-size:15px !important; color:#e5e5e5 !important; padding:0 !important; font-family:inherit !important; font-weight:500 !important; }
+.brand-dot { width:24px !important; height:24px !important; background:linear-gradient(135deg,#7c3aed,#a855f7) !important; border-radius:6px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; }
+.home-view, .chat-view { width:100% !important; max-width:none !important; }
+.hero .composer-mount { width:100% !important; max-width:720px !important; margin:0 auto !important; position:relative !important; }
+.config-chip, .daily-metric, .hero h1, .hero-desc, .reviews { display:none !important; }
+.sticky-composer { position:fixed !important; left:50% !important; bottom:10px !important; transform:translateX(-50%) !important; z-index:999 !important; pointer-events:none !important; }
+.sticky-composer > .composer { position:relative !important; margin:0 !important; max-width:1200px !important; width:calc(100% - 40px) !important; pointer-events:auto !important; box-sizing:border-box !important; }
+.custom-size-row input { width:80px !important; font-size:13px !important; background:#2a2a2a !important; color:#e5e5e5 !important; border:1px solid rgba(255,255,255,0.1) !important; border-radius:6px !important; padding:4px 8px !important; }
+.prompt-card { display:flex !important; flex-direction:column !important; }
+.prompt-card .card-actions { display:flex !important; justify-content:space-between !important; align-items:center !important; margin-top:auto !important; padding-top:8px !important; }
+.prompt-card .use-button { overflow:hidden !important; white-space:nowrap !important; text-overflow:ellipsis !important; font-size:11px !important; display:inline-flex !important; align-items:center !important; justify-content:center !important; gap:4px !important; }
+.example-grid { display:grid !important; grid-template-columns:repeat(5,1fr) !important; gap:8px !important; max-width:95% !important; margin:5px auto !important; padding:0 5px !important; }
+.custom-size-row.hidden { display:none !important; }
+.bottom-spacer, .chat-view .bottom-spacer { display:none !important; }
+
+.message-actions button, .message-actions a { background:rgba(255,255,255,0.08) !important; border:1px solid rgba(255,255,255,0.1) !important; border-radius:6px !important; color:#e5e5e5 !important; padding:6px 12px !important; font-size:12px !important; display:inline-flex !important; align-items:center !important; gap:4px !important; cursor:pointer !important; text-decoration:none !important; }
+.message-actions button:hover, .message-actions a:hover { background:rgba(255,255,255,0.1) !important; }
+.message-actions { display:flex !important; flex-wrap:wrap !important; gap:6px !important; margin-top:8px !important; }
+.message-prompt div { color:#e5e5e5 !important; font-size:14px !important; line-height:1.5 !important; }
+
+.message-card { background:rgba(20,20,31,0.5) !important;  !important; border-radius:12px !important; padding:10px !important; margin-bottom:14px !important; }
+.message-image { border-radius:10px !important; overflow:hidden !important; margin-bottom:10px !important; }
+.message-image img { width:100% !important; border-radius:10px !important; display:block !important; }
+.message-prompt { margin-bottom:8px !important; }
+.message-prompt div, .message-prompt div span { color:#e5e5e5 !important; font-size:14px !important; line-height:1.5 !important; }
+.message-actions { display:flex !important; gap:8px !important; flex-wrap:wrap !important; margin-top:12px !important; }
+.message-actions button, .message-actions a, .card-actions button { display:inline-flex !important; align-items:center !important; justify-content:center !important; gap:6px !important; padding:8px 16px !important; border-radius:6px !important; font-size:13px !important; font-weight:500 !important; border:none !important; cursor:pointer !important; background:#2a2a2a !important; color:#e0e0e0 !important; text-decoration:none !important; transition:all 0.15s !important; min-height:36px !important;  !important; }
+.message-actions button i, .message-actions a i, .card-actions button i { font-size:15px !important; }
+.prompt-card .card-actions button { background:#2a2a2a !important; color:#e0e0e0 !important; padding:8px 16px !important; font-size:13px !important; border-radius:6px !important;  !important; }
+
+.cell-overlay { display:flex !important; gap:6px !important; flex-wrap:wrap !important; margin-top:8px !important; }
+.cell-overlay a, .cell-overlay button { display:inline-flex !important; align-items:center !important; gap:5px !important; padding:7px 14px !important; border-radius:6px !important; font-size:12px !important; font-weight:500 !important; border:none !important; cursor:pointer !important; background:#2a2a2a !important; color:#e0e0e0 !important; text-decoration:none !important; transition:all 0.15s !important;  !important; }
+.cell-overlay a:hover, .cell-overlay button:hover { background:#1e1e35 !important; color:#e5e5e5 !important; }
+.image-grid { display:grid !important; grid-template-columns:repeat(4,1fr) !important; gap:10px !important; padding:0 !important; }
+.image-cell { background:rgba(255,255,255,0.02) !important;  !important; border-radius:12px !important; overflow:hidden !important; cursor:default !important; position:relative !important; aspect-ratio:1 !important; padding:0 !important; cursor:pointer !important; transition:transform 0.25s ease, box-shadow 0.25s ease !important; }
+.image-cell:hover { transform:translateY(-2px) !important; box-shadow:0 12px 40px rgba(124,58,237,0.15) !important; border-color:rgba(124,58,237,0.3) !important; }
+.image-cell img { width:100% !important; height:100% !important; object-fit:cover !important; display:block !important; transition:filter 0.2s !important; }
+.image-cell:hover img { filter:brightness(0.4) !important; }
+.image-cell .cell-overlay { position:absolute !important; top:8px !important; right:8px !important; display:flex !important; flex-direction:row !important; gap:6px !important; opacity:0 !important; transition:opacity 0.2s !important; pointer-events:none !important; padding:0 !important; margin:0 !important; }
+.image-cell:hover .cell-overlay { opacity:1 !important; pointer-events:auto !important; }
+.cell-overlay a:hover, .cell-overlay button:hover { background:linear-gradient(135deg,#7c3aed,#a855f7) !important; color:#0f0f0f !important; border-color:transparent !important; transform:scale(1.1) !important; }
+.inspiration-band { max-width:100% !important; padding:10px 10px 40px !important; }
+.history-list { padding:0 !important; max-width:100% !important; min-height:auto !important; }
+.chat-view { max-width:100% !important; padding:0 !important; }
+.prompt-drawer-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; opacity:0; pointer-events:none; transition:opacity 0.3s; }
+.prompt-drawer-overlay.open { opacity:1; pointer-events:auto; }
+.prompt-drawer { position:fixed; top:0; right:0; width:320px; height:100vh; background:rgba(20,20,20,0.97); backdrop-filter:blur(16px); border-left:1px solid rgba(255,255,255,0.08); z-index:1000; transform:translateX(100%); transition:transform 0.3s ease; display:flex; flex-direction:column; }
+.prompt-drawer.open { transform:translateX(0); }
+.prompt-drawer-head { display:flex; align-items:center; justify-content:space-between; padding:16px 16px 12px; border-bottom:1px solid rgba(255,255,255,0.08); flex-shrink:0; }
+.prompt-drawer-head span { font-size:14px; font-weight:500; color:#e5e5e5; font-family:inherit; }
+.prompt-drawer-head button { background:transparent; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px; border-radius:6px; transition:all 0.15s; }
+.prompt-drawer-head button:hover { background:rgba(255,255,255,0.08); color:#e5e5e5; }
+.prompt-drawer-content { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+.prompt-drawer-content::-webkit-scrollbar { width:4px; }
+.prompt-drawer-content::-webkit-scrollbar-track { background:transparent; }
+.prompt-drawer-content::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.1); border-radius:4px; }
+#promptDrawerToggle { position:fixed; right:20px; bottom:90px; width:44px; height:44px; background:linear-gradient(135deg,rgba(124,58,237,0.9)); backdrop-filter:blur(8px); border:none; border-radius:12px; color:#fff; font-size:18px; cursor:pointer; z-index:998; display:flex; align-items:center; justify-content:center; transition:all 0.25s; box-shadow:0 4px 20px rgba(124,58,237,0.3); }
+#promptDrawerToggle:hover { transform:scale(1.05) !important; box-shadow:0 4px 20px rgba(124,58,237,0.3) !important; }
+
+.home-view { padding:0 !important; }
+.recent-header, .history-header { display:none !important; }
+.recent-masonry { gap:10px !important; padding:0 !important; grid-template-columns:repeat(4,1fr) !important; }
+.image-grid { gap:10px !important; padding:0 !important; grid-template-columns:repeat(4,1fr) !important; }
+.history-list { padding:0 !important; max-width:100% !important; min-height:auto !important; }
+.prompt-card h3 { color:#e0e0e0 !important; font-weight:500 !important; }
+/* === UI Enhancements === */
+
+.recent-tile { cursor:pointer !important; transition:transform 0.3s ease, box-shadow 0.3s ease !important; border-radius:12px !important; overflow:hidden !important; }
+.recent-tile:hover { transform:translateY(-2px) !important; box-shadow:0 12px 40px rgba(124,58,237,0.12) !important; }
+.prompt-card { cursor:pointer !important; transition:transform 0.25s ease, box-shadow 0.25s ease !important; border-radius:12px !important; }
+.prompt-card:hover { transform:translateY(-2px) !important; box-shadow:0 12px 40px rgba(124,58,237,0.12) !important; }
+.send-button { background:linear-gradient(135deg,#7c3aed,#a855f7) !important; color:#0f0f0f !important; font-weight:500 !important; transition:all 0.25s ease !important; box-shadow:0 4px 15px rgba(124,58,237,0.3) !important; }
+.send-button:hover { transform:translateY(-2px) !important; box-shadow:0 6px 25px rgba(124,58,237,0.4) !important; }
+.send-button:disabled { opacity:0.35 !important; transform:none !important; box-shadow:none !important; }
+.composer { transition:box-shadow 0.4s ease, border-color 0.4s ease !important; }
+.composer:focus-within { border-color:rgba(124,58,237,0.3) !important; box-shadow:0 8px 50px rgba(124,58,237,0.12), 0 0 0 1px rgba(192,132,252,0.12) !important; }
+.prompt-drawer-content .prompt-card { border:1px solid rgba(255,255,255,0.02) !important; border-radius:12px !important; background:rgba(255,255,255,0.02) !important; transition:all 0.2s ease !important; }
+.prompt-drawer-content .prompt-card:hover { border-color:rgba(124,58,237,0.3) !important; background:rgba(124,58,237,0.06) !important; }
+.image-grid { cursor:pointer !important; }
+</style>
+</head>
+  <body>
+    <div id="app" class="app">
+    <div style="display:none" data-version="1782228865">v1782228865</div>
+      <div class="ambient" aria-hidden="true"></div>
+
+      <header class="topbar">
+        <button id="brandBtn" class="brand-btn" type="button">
+          <img src="/logo.png" alt="Imagens" style="width:24px;height:24px;border-radius:6px">
+          <span data-i18n="brand">Imagens</span>
+        </button>
+        <nav class="top-actions" aria-label="Main Navigation">
+          <button id="promptLibraryBtn" class="nav-pill" type="button">
+            <span class="sparkle-icon" aria-hidden="true">✨</span>
+            <span data-i18n="promptLibrary">Prompt Library</span>
+          </button>
+          <button id="imageEditorBtn" class="nav-pill" type="button">
+            <i class="ri-magic-line"></i>
+            <span data-i18n="imageEditor">Image Editor</span>
+          </button>
+          <button id="contactBtn" class="nav-pill hidden" type="button">
+            <i class="ri-customer-service-2-line"></i>
+            <span data-i18n="contact">Contact Admin</span>
+          </button>
+          <button id="creditsBtn" class="nav-pill hidden" type="button">
+            <i class="ri-coin-line"></i>
+            <span id="creditsText">0</span>
+          </button>
+          <button id="myWorksBtn" class="nav-pill hidden" type="button">
+            <i class="ri-gallery-view-2"></i>
+            <span data-i18n="myWorks">My Works</span>
+          </button>
+          <button id="langBtn" class="icon-pill" type="button" title="Language">EN/RU</button>
+          <button id="adminBtn" class="nav-pill hidden" type="button">
+            <i class="ri-settings-3-line"></i>
+            <span data-i18n="admin">Admin</span>
+          </button>
+          <button id="loginBtn" class="dark-pill" type="button">
+            <i class="ri-login-circle-line"></i>
+            <span data-i18n="login">Login</span>
+          </button>
+          <button id="logoutBtn" class="nav-pill hidden" type="button">
+            <i class="ri-logout-circle-r-line"></i>
+          </button>
+        </nav>
+      </header>
+
+      <main id="homeView" class="home-view">
+        <section class="hero">
+          
+          <p id="apiStatus" class="config-chip">Checking...</p>
+          <div class="daily-metric" aria-live="polite">
+            <span class="metric-stars">★★★★★</span>
+            <span id="todayGeneratedText">Generated today 4,200+ images</span>
+            <span class="metric-dots" aria-hidden="true">
+              <i></i><i></i><i></i><i></i><i></i>
+            </span>
+          </div>
+          <h1>
+            <span data-i18n="headPre">Create with</span>
+            <em data-i18n="headItalic">imagination</em>
+            <span data-i18n="headPost"></span>
+          </h1>
+          <p data-i18n="desc" class="hero-desc">Transform your ideas into polished visuals with GPT Image. Just describe what you see in your mind.</p>
+          <p class="reviews"><i class="ri-image-circle-line"></i><span data-i18n="reviews">Generated images are saved to your gallery</span></p>
+        </section>
+
+        <section id="recentSection" class="recent-section hidden">
+          <div class="recent-header">
+            <h2 data-i18n="recentTitle">Recent Creations</h2>
+            <p data-i18n="recentSubtitle">Your creative history</p>
+          </div>
+          <div id="recentMasonry" class="recent-masonry"></div>
+        </section>
+
+        <section id="historySection" class="history-section hidden">
+          <div class="history-header">
+            <h2 data-i18n="myWorks">My Works</h2>
+
+            <p data-i18n="recentSubtitle">Your creative history</p>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </main>
+
+      <div id="stickyComposerMount" class="sticky-composer"></div>
+
+      <div id="generationStatus" class="generation-status hidden">
+        <div class="paint-drip" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
+        <span id="funMessage">Generating...</span>
+      </div>
+
+      <main id="chatView" class="chat-view hidden">
+      </main>
+
+      <main id="libraryView" class="library-view hidden">
+        <section class="library-hero">
+          <span class="library-badge"><span class="sparkle-icon" aria-hidden="true">✨</span><span data-i18n="libraryBadge">Curated Prompt Library</span></span>
+          <h1 data-i18n="libraryTitle">Discover Endless Creativity</h1>
+          <p data-i18n="librarySubtitle">Search styles, scenes, and use cases, then send one straight to the composer.</p>
+          <form id="librarySearchForm" class="library-search">
+            <span data-i18n="librarySearchLabel">Library</span>
+            <i class="ri-search-line"></i>
+            <input id="librarySearchInput" placeholder="Search prompts, styles, or elements...">
+            <button type="submit" data-i18n="search">Search</button>
+          </form>
+          <div id="tagFilters" class="tag-filters"></div>
+        </section>
+        <section id="promptGrid" class="prompt-grid"></section>
+      </main>
+
+      <main id="editorView" class="editor-view hidden">
+        <section class="editor-stage">
+          <div class="editor-header">
+            <button class="editor-brand" type="button" data-editor-home>
+              <span class="brand-dot"><i class="ri-image-spark-line"></i></span>
+              <span data-i18n="imageEditor">Image Editor</span>
+            </button>
+            <div class="editor-tabs" aria-label="Creative Mode">
+              <button type="button" data-editor-create>
+                <i class="ri-sparkling-2-line"></i>
+                <span data-i18n="create">Generate</span>
+              </button>
+              <button class="active" type="button">
+                <i class="ri-pencil-ruler-2-line"></i>
+                <span data-i18n="editImage">Edit</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="editor-workspace">
+            <div class="editor-toolbar" role="toolbar" aria-label="EditTools">
+              <button class="active" type="button" data-editor-tool="brush" title="Brush"><i class="ri-brush-line"></i></button>
+              <button type="button" data-editor-tool="rect" title="Rectangle"><i class="ri-checkbox-blank-line"></i></button>
+              <button type="button" data-editor-tool="eraser" title="Eraser"><i class="ri-eraser-line"></i></button>
+              <button type="button" data-editor-undo title="Undo"><i class="ri-arrow-go-back-line"></i></button>
+              <input id="editorColorInput" type="color" value="#7c3aed" title="Marker Color">
+            </div>
+            <div id="editorCanvasArea" class="editor-canvas-area">
+              <label id="editorUploadCard" class="editor-upload-card">
+                <i class="ri-image-add-line"></i>
+                <strong data-i18n="uploadEditImage">Upload or choose an image</strong>
+                <span data-i18n="uploadEditHint">SupportBrush、RectangleSelection and localEditDescription</span>
+                <input id="editorUploadInput" type="file" accept="image/*">
+              </label>
+              <div id="editorImageFrame" class="editor-image-frame hidden">
+                <div id="editorImageScaler" class="editor-image-scaler">
+                  <img id="editorSourceImage" alt="EditImage">
+                  <canvas id="editorMaskCanvas"></canvas>
+                </div>
+              </div>
+            </div>
+            <div class="editor-zoom">
+              <button type="button" data-editor-zoom="-"><i class="ri-subtract-line"></i></button>
+              <span id="editorZoomText">100%</span>
+              <button type="button" data-editor-zoom="+"><i class="ri-add-line"></i></button>
+            </div>
+            <label class="editor-keyboard" title="Shortcuts"><i class="ri-keyboard-line"></i></label>
+            <form id="editorPromptForm" class="editor-prompt-bar">
+              <label class="editor-attach">
+                <i class="ri-image-add-line"></i>
+                <input id="editorBottomUploadInput" type="file" accept="image/*">
+              </label>
+              <i class="ri-sparkling-2-fill editor-prompt-icon"></i>
+              <input id="editorPromptInput" placeholder="e.g., make the background pond full of lotus flowers">
+              <label class="square-toggle editor-public-toggle hidden">
+                <span data-i18n="publishToSquare">Publish to Square</span>
+                <input id="editorPublicInput" type="checkbox">
+                <span class="toggle-track" aria-hidden="true"></span>
+              </label>
+              <button type="submit">
+                <span data-i18n="create">Generate</span>
+                <i class="ri-arrow-right-line"></i>
+              </button>
+            </form>
+          </div>
+        </section>
+      </main>
+
+      <template id="composerTemplate">
+        <form class="composer">
+          <div class="composer-head">
+            <button class="model-chip options-toggle" type="button">
+              <span class="model-label">Gemini Flash</span>
+            </button>
+            <label class="square-toggle hidden">
+              <span data-i18n="publishToSquare">Publish to Square</span>
+              <input class="public-input" type="checkbox">
+              <span class="toggle-track" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="reference-row hidden"></div>
+          <div class="composer-bar">
+            <label class="add-reference-button" title="Reference image">
+              <i class="ri-add-line"></i>
+              <input class="reference-input" type="file" accept="image/*" multiple>
+            </label>
+            <textarea class="prompt-box" rows="1" placeholder="Describe the image you want to create..."></textarea>
+            <div class="composer-spacer"></div>
+            <button class="send-button" type="submit">
+              <span data-i18n="create">Generate</span>
+            </button>
+          </div>
+          <div class="advanced-options hidden">
+            <label>
+              <span data-i18n="size">Size</span>
+              <select class="size-input">
+                <option value="1024x1024">1:1</option>
+                <option value="1024x1536">2:3</option>
+                <option value="1536x1024">3:2</option>
+                <option value="768x1024" selected>3:4</option>
+                <option value="1024x768">4:3</option>
+                <option value="2048x2048">2K 1:1</option>
+                <option value="2048x3072">2K 2:3</option>
+                <option value="3072x2048">2K 3:2</option>
+                <option value="2880x3840">4K 3:4</option>
+                <option value="3840x2880">4K 4:3</option>
+                <option value="512x512">512</option>
+                <option value="custom">Custom</option>
+              </select>
+            </label>
+            <div class="custom-size-row hidden">
+              <label>
+                <span>Width</span>
+                <input class="custom-width-input" type="number" min="512" max="3840" step="16" value="2048">
+              </label>
+              <label>
+                <span>Height</span>
+                <input class="custom-height-input" type="number" min="512" max="3840" step="16" value="2048">
+              </label>
+            </div>
+            <label>
+              <span>Images</span>
+              <select class="n-input">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="quality">Quality</span>
+              <select class="quality-input">
+                <option value="auto">Auto</option>
+                <option value="low">Low</option>
+                <option value="medium" selected>Medium</option>
+                <option value="high">High</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="background">Background</span>
+              <select class="background-input">
+                <option value="auto">Auto</option>
+                <option value="opaque">Opaque</option>
+                <option value="transparent">Transparent</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="format">Format</span>
+              <select class="format-input">
+                <option value="png">PNG</option>
+                <option value="webp">WebP</option>
+                <option value="jpeg">JPEG</option>
+              </select>
+            </label>
+          </div>
+          <div class="gen-bar-wrap"><div class="gen-bar-fill"></div></div>
+        </form>
+      </template>
+
+      <div id="modalLayer" class="modal-layer hidden"></div>
+      <div id="toastLayer" class="toast-layer"></div>
+
+      <div id="promptDrawerOverlay" class="prompt-drawer-overlay"></div>
+      <aside id="promptDrawer" class="prompt-drawer">
+        <div class="prompt-drawer-head">
+          <span data-i18n="examplesLabel">Prompts</span>
+          <button id="promptDrawerClose" type="button"><i class="ri-close-line"></i></button>
+        </div>
+        <div id="promptDrawerContent" class="prompt-drawer-content"></div>
+      </aside>
+      <button id="promptDrawerToggle" type="button" title="Prompts">
+        <i class="ri-chat-quote-line"></i>
+      </button>
+    </div>
+
+    <script src="/app.js?v=1783450000" defer></script>
+    <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      function filterUI() {
+        try {
+          if (typeof state === "undefined" || !state.settings) { setTimeout(filterUI, 300); return; }
+          var s = state;
+          var isAdmin = s.user && s.user.role === "admin";
+          var global = JSON.parse(s.settings.uiConfig || "{}");
+          var user = JSON.parse((s.user && s.user.effectiveConfig) || "{}");
+          var cfg = Object.assign({}, global, user);
+          ["sizes","qualityOptions","backgroundOptions","formatOptions"].forEach(function(k){if(user[k])cfg[k]=user[k];});
+          document.querySelectorAll(".composer").forEach(function(f) {
+            var sz = f.querySelector(".size-input");
+            if (sz) [sz.options].forEach(function(o){o.hidden = !(o.value==="custom"||isAdmin||(cfg.sizes||[]).includes(o.value));});
+            var ql = f.querySelector(".quality-input");
+            if (ql) [ql.options].forEach(function(o){o.hidden = !(isAdmin||(cfg.qualityOptions||[]).includes(o.value));});
+            var bg = f.querySelector(".background-input");
+            if (bg) [bg.options].forEach(function(o){o.hidden = !(isAdmin||(cfg.backgroundOptions||[]).includes(o.value));});
+            var fmt = f.querySelector(".format-input");
+            if (fmt) [fmt.options].forEach(function(o){o.hidden = !(isAdmin||(cfg.formatOptions||[]).includes(o.value));});
+          });
+        } catch(e) { setTimeout(filterUI, 500); }
+      }
+      setTimeout(filterUI, 800);
+
+      if (typeof i18n !== "undefined") { if (i18n.zh) i18n.zh.use = "Generate"; if (i18n.en) i18n.en.use = "Generate"; }
+
+      var _sgen = submitGeneration;
+      if (_sgen) {
+        submitGeneration = async function(form) {
+          await _sgen(form);
+          try {
+            if (typeof loadHistory === "function") await loadHistory();
+            if (typeof renderHistory === "function") renderHistory();
+            document.querySelectorAll(".size-input").forEach(function(s) { s.value = "768x1024"; });
+          } catch(e) {}
+        };
+      }
+
+      setTimeout(function() {
+        document.querySelectorAll(".size-input").forEach(function(s) {
+          s.value = "768x1024";
+          s.dispatchEvent(new Event("change", {bubbles:true}));
+        });
+      }, 300);
+    
+      // Hero composer removed - stickyComposerMount handles everything
+});
+    
+</script>
+<script>
+// Suppress "Cannot read image.png" errors from apinet.cloud
+(function() {
+  var origShow = window.showToast;
+  if (origShow) {
+    window.showToast = function(msg, icon) {
+      if (msg && (msg.indexOf("Cannot read") >= 0 || msg.indexOf("does not support image") >= 0)) {
+        console.warn("Suppressed:", msg);
+        return;
+      }
+      origShow(msg, icon);
+    };
+  }
+})();
+
+      // Infinite scroll for image grid
+      window.addEventListener("scroll", function() {
+        var trigger = document.getElementById("loadMoreTrigger");
+        if (trigger && trigger.getBoundingClientRect().top < window.innerHeight + 200) {
+          if (typeof state !== "undefined" && state.historyVisible !== undefined) {
+            state.historyVisible += 20;
+            if (typeof renderHistory === "function") renderHistory();
+          }
+        }
+      });
+
+      // Enhance cells: stop image click -> editor, add Edit Image btn
+      if (typeof renderHistory === "function") {
+        var _origRH = renderHistory;
+        renderHistory = function() {
+          _origRH();
+          try {
+            document.querySelectorAll(".image-cell").forEach(function(cell) {
+              var img = cell.querySelector("img");
+              if (img) img.addEventListener("click", function(e) { e.stopPropagation(); });
+              var overlay = cell.querySelector(".cell-overlay");
+              if (overlay && !overlay.querySelector("[data-edit-image]")) {
+                var itemId = cell.dataset.cellId;
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.dataset.editImage = itemId;
+                btn.innerHTML = '<i class="ri-magic-line"></i> ' + (typeof text === "function" ? text("openEditor") : "Edit image");
+                btn.style.cssText = "display:inline-flex;align-items:center;gap:5px;padding:7px 14px;border-radius:6px;font-size:12px;border:none;cursor:pointer;background:#2a2a2a;color:#e5e5e5;";
+                btn.addEventListener("click", function(e) {
+                  e.stopPropagation();
+                  var item = state.history.find(function(entry) { return String(entry.id) === this.dataset.editImage; }.bind(this));
+                  if (item && item.images && item.images[0] && typeof openImageEditor === "function") {
+                    openImageEditor(item.images[0], item.prompt);
+                  }
+                });
+                overlay.appendChild(btn);
+              }
+            });
+          } catch(e) {}
+        };
+      }
+
+      // Prompt drawer toggle
+      var drawer = document.getElementById("promptDrawer");
+      var overlay = document.getElementById("promptDrawerOverlay");
+      var toggleBtn = document.getElementById("promptDrawerToggle");
+      var closeBtn = document.getElementById("promptDrawerClose");
+      function openDrawer() { if(drawer) drawer.classList.add("open"); if(overlay) overlay.classList.add("open"); }
+      function closeDrawer() { if(drawer) drawer.classList.remove("open"); if(overlay) overlay.classList.remove("open"); }
+      if (toggleBtn) toggleBtn.addEventListener("click", openDrawer);
+      if (closeBtn) closeBtn.addEventListener("click", closeDrawer);
+      if (overlay) overlay.addEventListener("click", closeDrawer);
+    </script>
+
+      <script src="/filerobot-bundle.js"></script>
+  </body>
+</html>
