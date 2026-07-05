@@ -13,7 +13,7 @@ A self-hosted AI image generation platform with multi-provider failover, user ma
   <img src="screenshot/4.png" width="45%" alt="Image Editor">
     <br>
   <img src="screenshot/5.png" width="45%" alt="Admin Dashboard">
-  <img src="screenshot/6.png" width="45%" alt="Providers">
+  <img src="screenshot/7.png" width="45%" alt="Providers">
 </p>
 
 ---
