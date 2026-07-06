@@ -100,7 +100,7 @@ function generateToken() {
 }
 
 function makeCsp(nonce) {
-  return `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'`;
+  return `default-src 'self'; script-src 'self' 'nonce-${nonce}'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net; img-src 'self' data: blob:; connect-src 'self' https://imagens.ru wss://imagens.ru; frame-ancestors 'none'`;
 }
 
 function csrfCookie(token) {
@@ -447,6 +447,46 @@ function extractImageUrl(text) {
   return match ? match[1] : null;
 }
 
+async function downloadImage(url, timeoutMs = 15000) {
+  // Method 1: https.get (native Node.js TLS)
+  try {
+    return await new Promise((resolve, reject) => {
+      const u = new URL(url);
+      const mod = u.protocol === "https:" ? require("https") : require("http");
+      const req = mod.get(url, { rejectUnauthorized: false, timeout: timeoutMs }, (res) => {
+        if (res.statusCode !== 200) { reject(new Error("HTTP " + res.statusCode)); return; }
+        const chunks = [];
+        res.on("data", c => chunks.push(c));
+        res.on("end", () => resolve({ b64: Buffer.concat(chunks).toString("base64") }));
+      });
+      req.on("error", reject);
+      req.on("timeout", () => { req.destroy(); reject(new Error("timeout")); });
+    });
+  } catch (e) { console.log("[DL 1/3 https.get] " + e.message); }
+
+  // Method 2: curl (system OpenSSL)
+  try {
+    const { execSync } = require("child_process");
+    const buf = execSync(`curl -s -m ${Math.ceil(timeoutMs / 1000)} "${url}"`, { timeout: timeoutMs + 5000, maxBuffer: 50 * 1024 * 1024 });
+    if (buf && buf.length > 100) return { b64: Buffer.from(buf).toString("base64") };
+    throw new Error("curl returned empty or too small");
+  } catch (e) { console.log("[DL 2/3 curl] " + e.message); }
+
+  // Method 3: fetch with custom https.Agent
+  try {
+    const https = require("https");
+    const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: false });
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), timeoutMs);
+    const resp = await fetch(url, { agent, signal: ctrl.signal, headers: { "User-Agent": "Mozilla/5.0" } });
+    clearTimeout(t);
+    if (resp.ok) return { b64: Buffer.from(await resp.arrayBuffer()).toString("base64") };
+    throw new Error("HTTP " + resp.status);
+  } catch (e) { console.log("[DL 3/3 fetch+agent] " + e.message); }
+
+  throw httpError("Image download failed", 502);
+}
+
 async function callGemini(settings, prompt, references, size, n = 1) {
   const fetchWithKey = async (apiKey, base, model, prompt, references, size, providerType) => {
     providerType = providerType || (model.includes("gemini") ? "chat" : "openai");
@@ -489,11 +529,7 @@ async function callGemini(settings, prompt, references, size, n = 1) {
       const imageUrl = extractImageUrl(msgContent);
       if (imageUrl) {
         try {
-          const ctrl = new AbortController();
-          const t = setTimeout(() => ctrl.abort(), 15000);
-          const resp = await fetch(imageUrl, { signal: ctrl.signal, headers: {"User-Agent":"Mozilla/5.0"} });
-          clearTimeout(t);
-          if (resp.ok) return { b64: Buffer.from(await resp.arrayBuffer()).toString("base64") };
+          return await downloadImage(imageUrl, 15000);
         } catch(e) { console.log("[IMG DL FAIL] " + e.message); }
       }
       const genEndpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
@@ -508,23 +544,17 @@ async function callGemini(settings, prompt, references, size, n = 1) {
       try { genData = JSON.parse(genText); } catch(e) { throw httpError("Invalid API response", 502); }
       if (genData.data?.[0]?.b64_json) return { b64: genData.data[0].b64_json };
       if (genData.data?.[0]?.url) {
-        const ctrl2 = new AbortController();
-        const t2 = setTimeout(() => ctrl2.abort(), 30000);
-        const resp2 = await fetch(genData.data[0].url, { signal: ctrl2.signal, headers: {"User-Agent":"Mozilla/5.0"} });
-        clearTimeout(t2);
-        if (resp2.ok) return { b64: Buffer.from(await resp2.arrayBuffer()).toString("base64") };
+        try {
+          return await downloadImage(genData.data[0].url, 30000);
+        } catch(e) { console.log("[FALLBACK DL FAIL] " + e.message); }
       }
       throw httpError("No image in fallback response", 502);
     }
     if (data.data?.[0]?.b64_json) return { b64: data.data[0].b64_json };
     if (data.data?.[0]?.url) {
       try {
-        const ctrl = new AbortController();
-        const t = setTimeout(() => ctrl.abort(), 30000);
-        const resp = await fetch(data.data[0].url, { signal: ctrl.signal, headers: {"User-Agent":"Mozilla/5.0"} });
-        clearTimeout(t);
-        if (resp.ok) return { b64: Buffer.from(await resp.arrayBuffer()).toString("base64") };
-      } catch(e) { console.log("[IMG DL] " + e.message); throw httpError("Image download failed", 502); }
+        return await downloadImage(data.data[0].url, 30000);
+      } catch(e) { console.log("[IMG DL FAIL] " + e.message); throw httpError("Image download failed", 502); }
     }
     throw httpError("No image in API response", 502);
   };
@@ -803,33 +833,7 @@ async function routeApi(req, res, url) {
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/register") {
-    const body = await readJsonBody(req);
-    const email = normalizeEmail(body.email);
-    const password = String(body.password || "");
-    requireEmail(email);
-    requirePassword(password);
-    const isFirstUser = (await store.countUsers()) === 0;
-    const settings = await store.getSettings();
-    if (!isFirstUser && !settings.allowRegistration) {
-      throw httpError("Registration is closed. Contact administrator.", 403);
-    }
-    if (await store.getUserByEmail(email)) {
-      throw httpError("Email is already registered", 409);
-    }
-    const name = String(body.name || "").trim() || email.split("@")[0];
-    const user = await store.createUser({
-      id: randomId("usr_"),
-      name: name.slice(0, 60),
-      email,
-      passwordHash: hashPassword(password),
-      role: isFirstUser ? "admin" : "user",
-      status: "active",
-      credits: Math.max(0, Number(settings.defaultCredits ?? 10) || 0)
-    });
-    const token = await createSession(user.id);
-    return sendJson(res, 201, { user: serializeUser(user) }, {
-      "Set-Cookie": `session=${encodeURIComponent(token)}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`
-    });
+    throw httpError("Registration is closed. Contact administrator.", 403);
   }
 
   if (req.method === "POST" && url.pathname === "/api/auth/login") {
@@ -1082,10 +1086,13 @@ async function routeApi(req, res, url) {
     const before = String(url.searchParams.get("before") || "").trim();
     const limit = Math.max(1, Math.min(200, Number(url.searchParams.get("limit")) || 20));
     const targetUserId = url.searchParams.get("userId") || "";
-    const effectiveUser = (targetUserId && current.user.role === "admin")
-      ? (await store.getUserById(targetUserId)) || current.user
-      : current.user;
-    const items = await store.listGenerationsForUser(effectiveUser, { before: before || undefined, limit: limit + 1 });
+    const adminShowAll = targetUserId === "all" && current.user.role === "admin";
+    const effectiveUser = adminShowAll
+      ? current.user
+      : (targetUserId && current.user.role === "admin")
+        ? (await store.getUserById(targetUserId)) || current.user
+        : current.user;
+    const items = await store.listGenerationsForUser(effectiveUser, { before: before || undefined, limit: limit + 1, adminShowAll });
     const hasMore = items.length > limit;
     if (hasMore) items.pop();
     const generations = items.map((generation) => ({
@@ -1357,14 +1364,31 @@ async function handleRequest(req, res) {
 }
 
 async function bootstrapAdminAccount() {
-  // First registered user becomes admin automatically via register endpoint
   const rawEmail = String(process.env.ADMIN_EMAIL || "").trim();
   const rawPassword = String(process.env.ADMIN_PASSWORD || "");
-  if (!rawEmail || !rawPassword) return;
+  if (!rawEmail && !rawPassword) {
+    if ((await store.countAdmins()) === 0) {
+      console.warn("No admin account found. Set ADMIN_EMAIL and ADMIN_PASSWORD, then restart to create one.");
+    }
+    return;
+  }
+  if (!rawEmail || !rawPassword) {
+    throw new Error("ADMIN_EMAIL and ADMIN_PASSWORD must be set together.");
+  }
+
   const email = normalizeEmail(rawEmail);
   requireEmail(email);
   requirePassword(rawPassword);
-  if (await store.getUserByEmail(email)) return;
+
+  const existing = await store.getUserByEmail(email);
+  if (existing) {
+    if (existing.role !== "admin" || existing.status !== "active") {
+      await store.updateUser(existing.id, { role: "admin", status: "active" });
+      console.log(`Admin account activated for ${email}`);
+    }
+    return;
+  }
+
   const settings = await store.getSettings();
   await store.createUser({
     id: randomId("usr_"),
