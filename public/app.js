@@ -990,14 +990,13 @@ function renderHistory() {
   var isAdmin = state.user && state.user.role === "admin";
   var filterHtml = "";
   if (isAdmin) {
-    var selUser = state.adminFilterUserId ? (state.adminUsers || []).find(function(u) { return u.id === state.adminFilterUserId; }) : null;
-    filterHtml = '<div id="adminFilterWrap" style="margin-bottom:12px;display:flex;align-items:center;gap:8px;position:relative">' +
+    var selUserId = state.adminFilterUserId;
+    var otherUsers = (state.adminUsers || []).filter(function(u) { return u.id !== state.user?.id; });
+    var userOpts = '<option value="" ' + (selUserId === "" ? "selected" : "") + '>My Works</option><option value="all" ' + (selUserId === "all" ? "selected" : "") + '>All Users</option>' + otherUsers.map(function(u) { return '<option value="' + u.id + '" ' + (u.id === selUserId ? "selected" : "") + '>' + escapeHtml(u.name || u.email) + '</option>'; }).join("");
+    filterHtml = '<div id="adminFilterWrap" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">' +
       '<label style="font-size:12px;color:#888;white-space:nowrap">Filter user:</label>' +
-      '<div style="position:relative;flex:1;max-width:280px">' +
-      '<input id="afInput" type="text" placeholder="Type to search..." value="' + (selUser ? escapeHtml(selUser.name || selUser.email) : "") + '" style="width:100%;padding:6px 28px 6px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px">' +
-      '<button id="afClear" type="button" style="position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;font-size:14px;color:#999;display:' + (selUser ? "inline" : "none") + '">&times;</button>' +
-      '<div id="afList" style="display:none;position:absolute;top:100%;left:0;right:0;z-index:100;background:#fff;border:1px solid #d0d5dd;border-radius:8px;max-height:200px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,0.1)"></div>' +
-      '</div></div>';
+      '<select id="adminUserSelect" style="flex:1;max-width:280px;padding:6px 10px;border:1px solid #d0d5dd;border-radius:8px;font-size:13px">' + userOpts + '</select>' +
+      '</div>';
   }
 
   elements.historyList.innerHTML = filterHtml + `
@@ -1106,47 +1105,18 @@ function renderHistory() {
   });
   setupHistoryScroll();
 
-  // Bind admin filter autocomplete
-  var afInput = document.getElementById("afInput");
-  var afList = document.getElementById("afList");
-  var afClear = document.getElementById("afClear");
-  if (afInput) {
-    afInput.oninput = function() {
-      var q = this.value.toLowerCase();
-      var items = (state.adminUsers || []).filter(function(u) { return (u.name || u.email).toLowerCase().indexOf(q) >= 0; });
-      afList.innerHTML = items.map(function(u) { return '<div class="af-item" data-id="' + u.id + '" style="padding:6px 10px;cursor:pointer;font-size:13px;border-bottom:1px solid #eee">' + escapeHtml(u.name || u.email) + ' <span style="color:#999;font-size:11px">' + escapeHtml(u.email) + '</span></div>'; }).join("");
-      afList.style.display = items.length && q ? "block" : "none";
-    };
-    afList.onclick = function(e) {
-      var item = e.target.closest(".af-item");
-      if (!item) return;
-      state.adminFilterUserId = item.dataset.id;
-      afInput.value = item.textContent.trim().split(" ")[0];
-      afList.style.display = "none";
-      afClear.style.display = "inline";
-      // Reload history with new filter
+  // Bind admin filter select
+  var adminSelect = document.getElementById("adminUserSelect");
+  if (adminSelect) {
+    adminSelect.onchange = function() {
+      state.adminFilterUserId = this.value;
       state.history = [];
       state.historyLoaded = false;
       historyLoading = false;
       state.historyEnd = false;
+      state.forceHero = false;
       loadHistory();
     };
-    if (afClear) {
-      afClear.onclick = function() {
-        state.adminFilterUserId = "";
-        afInput.value = "";
-        afClear.style.display = "none";
-        afList.style.display = "none";
-        state.history = [];
-        state.historyLoaded = false;
-        historyLoading = false;
-        state.historyEnd = false;
-        loadHistory();
-      };
-    }
-    document.addEventListener("click", function(e) {
-      if (!e.target.closest("#adminFilterWrap")) afList.style.display = "none";
-    });
   }
 }
 // Infinite scroll: IntersectionObserver for history sentinel

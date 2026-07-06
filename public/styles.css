@@ -133,6 +133,8 @@ a {
   transition: transform 0.2s ease, background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
+#creditsText { position: relative; top: -1px; }
+
 .brand-btn {
   background: transparent;
   color: var(--ink);

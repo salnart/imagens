@@ -89,10 +89,12 @@ function renderAdmin() {
 
 async function loadPanel() {
   if (state.view === "dashboard") {
+    var today = new Date();
+    var todayStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
     let [settings, users, records] = await Promise.all([
       api("/api/admin/settings").catch(() => null),
       api("/api/admin/users").catch(() => ({ users: [] })),
-      api("/api/admin/generations?limit=10").catch(() => ({ records: [] }))
+      api("/api/admin/generations?limit=20&from=" + todayStr).catch(() => ({ records: [] }))
     ]);
     state.settings = settings;
     state.users = users.users || [];
@@ -125,27 +127,30 @@ async function loadPanel() {
 
 function renderDashboard() {
   let s = state.settings || {};
-  let totalGen = state.records.length || 0;
-  let totalUsers = state.users.length || 0;
-  let failedGen = state.records.filter(r => r.status === "failed").length;
-  let recent = state.records.slice(0, 5);
+  let records = Array.isArray(state.records) ? state.records : [];
+  let totalGen = records.length;
+  let totalUsers = (state.users || []).length;
+  let failedGen = records.filter(r => r.status === "failed").length;
+  let activeUsers = new Set(records.filter(r => r.userId).map(r => r.userId)).size;
+  let recent = records.slice(0, 20);
 
   $("#adminApp").innerHTML = `
     <div class="hero">
       <h1>Dashboard</h1>
-      <p>Overview of your GPT Image Studio instance.</p>
+      <p>Overview of your Imagens instance.</p>
     </div>
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-label">Users</div><div class="stat-value">${totalUsers}</div></div>
-      <div class="stat-card"><div class="stat-label">Generations</div><div class="stat-value">${totalGen}</div></div>
-      <div class="stat-card"><div class="stat-label">Failed</div><div class="stat-value" style="color:var(--red)">${failedGen}</div></div>
+      <div class="stat-card"><div class="stat-label">Generations Today</div><div class="stat-value">${totalGen}</div></div>
+      <div class="stat-card"><div class="stat-label">Active Users Today</div><div class="stat-value">${activeUsers}</div></div>
+      <div class="stat-card"><div class="stat-label">Failed Today</div><div class="stat-value" style="color:var(--red)">${failedGen}</div></div>
       <div class="stat-card"><div class="stat-label">Providers</div><div class="stat-value">${(s.providers || []).length}</div></div>
     </div>
     <div class="card">
       <h2>Recent Activity</h2>
       ${recent.length ? `<div class="table-wrap"><table><thead><tr><th>Time</th><th>User</th><th>Prompt</th><th>Status</th></tr></thead><tbody>${
         recent.map(r => `<tr><td>${fmt(r.createdAt)}</td><td><strong>${esc(r.userName || r.userEmail || "?")}</strong></td><td class="prompt-cell">${esc(r.prompt).slice(0, 80)}</td><td><span class="badge ${r.status === "success" ? "badge-success" : r.status === "failed" ? "badge-failed" : "badge-pending"}">${esc(r.status)}</span></td></tr>`).join("")
-      }</tbody></table></div>` : `<div class="empty">No generations yet</div>`}
+      }</tbody></table></div>` : `<div class="empty">No generations today</div>`}
     </div>`;
 }
 
@@ -193,7 +198,7 @@ function renderLogs() {
       </div>
       <div class="table-wrap">
         ${page.length ? `<table><thead><tr><th>Image</th><th>User</th><th>Prompt</th><th>IP</th><th>Provider</th><th>Public</th><th>Status</th><th>Time</th></tr></thead><tbody>${
-          page.map(r => { let fullPrompt = esc(r.prompt); let shortPrompt = fullPrompt.length > 120 ? fullPrompt.slice(0, 120) + '...' : fullPrompt; let hasMore = fullPrompt.length > 120; return `<tr><td>${r.firstGenerationId ? `<div class="thumb-row">${(r.generationIds && r.generationIds.length ? r.generationIds : [r.firstGenerationId]).map(id => `<img class="thumb adm-thumb" src="/api/images/${id}/file" data-id="${esc(id)}" loading="lazy">`).join("")}</div>` : '<div class="thumb" style="opacity:0.2"><i class="ri-image-line" style="display:grid;place-items:center;height:100%"></i></div>'}</td><td><strong>${esc(r.userName || r.userEmail || "?")}</strong><br><span class="muted">${esc(r.userEmail || "")}</span></td><td class="prompt-cell"><span class="prompt-wrap">${shortPrompt}${hasMore ? `<span class="prompt-toggle" data-full="${fullPrompt}" style="font-size:10px;color:var(--accent);cursor:pointer;margin-left:4px">\u25BC</span>` : ''}</span>${r.errorMessage ? `<br><span class="muted" style="color:var(--red)">${esc(r.errorMessage).slice(0, 100)}</span>` : ""}</td><td><span style="font-size:12px">${esc(r.ipAddress || "-")}</span></td><td><span style="font-size:12px">${esc(r.provider || "-")}</span></td><td>${r.isPublic ? '<span style="color:var(--green)">Yes</span>' : "No"}</td><td><span class="badge ${r.status === "success" ? "badge-success" : r.status === "failed" ? "badge-failed" : "badge-pending"}">${esc(r.status)}</span></td><td style="white-space:nowrap;font-size:12px">${fmtFull(r.createdAt)}</td></tr>`; }).join("")
+          page.map(r => { let fullPrompt = esc(r.prompt); let shortPrompt = fullPrompt.length > 120 ? fullPrompt.slice(0, 120) + '...' : fullPrompt; let hasMore = fullPrompt.length > 120; let errorDetail = r.errorMessage ? esc(r.errorMessage) : ""; return `<tr><td>${r.firstGenerationId ? `<div class="thumb-row">${(r.generationIds && r.generationIds.length ? r.generationIds : [r.firstGenerationId]).map(id => `<img class="thumb adm-thumb" src="/api/images/${id}/file" data-id="${esc(id)}" loading="lazy">`).join("")}</div>` : '<div class="thumb" style="opacity:0.2"><i class="ri-image-line" style="display:grid;place-items:center;height:100%"></i></div>'}</td><td><strong>${esc(r.userName || r.userEmail || "?")}</strong><br><span class="muted">${esc(r.userEmail || "")}</span></td><td class="prompt-cell"><span class="prompt-wrap">${shortPrompt}${hasMore ? `<span class="prompt-toggle" data-full="${fullPrompt}" style="font-size:10px;color:var(--accent);cursor:pointer;margin-left:4px">\u25BC</span>` : ''}</span></td><td><span style="font-size:12px">${esc(r.ipAddress || "-")}</span></td><td><span style="font-size:12px">${esc(r.provider || "default")}</span></td><td>${r.isPublic ? '<span style="color:var(--green)">Yes</span>' : "No"}</td><td><span class="badge ${r.status === "success" ? "badge-success" : r.status === "failed" ? "badge-failed" : "badge-pending"} log-status-badge" data-fullerror="${errorDetail}" style="cursor:pointer">${esc(r.status)}</span></td><td style="white-space:nowrap;font-size:12px">${fmtFull(r.createdAt)}</td></tr>`; }).join("")
         }</tbody></table>` : `<div class="empty">No logs found</div>`}
       </div>
     </div>`;
@@ -260,6 +265,35 @@ document.addEventListener("click", function(e) {
       pt.dataset.expanded = "1";
       wrap.appendChild(pt);
     }
+  }
+  let badge = e.target.closest(".log-status-badge");
+  if (badge) {
+    let err = badge.dataset.fullerror;
+    let st = badge.textContent.trim();
+    let row = badge.closest("tr");
+    let prompt = row ? (row.querySelector(".prompt-cell")?.textContent?.trim()?.slice(0, 300) || "") : "";
+    let provider = row ? (row.querySelector("td:nth-child(5)")?.textContent?.trim() || "") : "";
+    let ip = row ? (row.querySelector("td:nth-child(4)")?.textContent?.trim() || "") : "";
+    let time = row ? (row.querySelector("td:nth-child(8)")?.textContent?.trim() || "") : "";
+    let detail = st === "failed"
+      ? "Request failed with status 500\n\nError: " + (err || "No details available")
+      : "Request completed successfully (200 OK)";
+    let overlay = document.createElement("div");
+    overlay.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;padding:20px";
+    overlay.onclick = function(e) { if (e.target === overlay) overlay.remove(); };
+    let box = document.createElement("div");
+    box.style.cssText = "background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;max-width:620px;width:100%;max-height:85vh;overflow-y:auto";
+    box.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h2 style="margin:0;font-size:16px">' + (st === "failed" ? '<span style="color:var(--red)">\u2716 Generation Failed</span>' : '<span style="color:var(--green)">\u2714 Generation Success</span>') + '</h2><button class="btn btn-sm" id="statusModalClose" style="min-width:60px">\u2715</button></div>' +
+      '<div style="background:var(--soft);border-radius:8px;padding:16px;margin-bottom:12px;max-height:50vh;overflow-y:auto"><pre style="margin:0;font-size:12px;color:var(--ink-dim);white-space:pre-wrap;word-break:break-word;line-height:1.6;font-family:monospace">' + esc(detail) + '</pre></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;color:var(--ink-dim);margin-bottom:12px">' +
+        (prompt ? '<div><div style="font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;font-size:11px">Prompt</div><div style="color:var(--ink)">' + esc(prompt) + '</div></div>' : '') +
+        (provider ? '<div><div style="font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;font-size:11px">Provider</div><div style="color:var(--ink)">' + esc(provider) + '</div></div>' : '') +
+        (ip ? '<div><div style="font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;font-size:11px">IP</div><div style="color:var(--ink)">' + esc(ip) + '</div></div>' : '') +
+        (time ? '<div><div style="font-weight:600;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.04em;font-size:11px">Time</div><div style="color:var(--ink)">' + esc(time) + '</div></div>' : '') +
+      '</div>';
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    document.getElementById("statusModalClose").onclick = function() { overlay.remove(); };
   }
 });
 
