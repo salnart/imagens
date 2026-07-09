@@ -527,28 +527,31 @@ async function callGemini(settings, prompt, references, size, n = 1) {
     if (providerType === "chat") {
       const msgContent = data.choices?.[0]?.message?.content || "";
       const imageUrl = extractImageUrl(msgContent);
+      // Try /images/generations first (returns full resolution)
+      const genEndpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
+      try {
+        const genRes = await fetch(genEndpoint, {
+          method: "POST",
+          headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
+          body: JSON.stringify({ model, prompt: prompt + (size ? " (" + size + ")" : ""), n: 1, size: size || "1024x1024" })
+        });
+        const genText = await genRes.text();
+        if (genRes.ok) {
+          let genData;
+          try { genData = JSON.parse(genText); } catch(e) {}
+          if (genData?.data?.[0]?.b64_json) return { b64: genData.data[0].b64_json };
+          if (genData?.data?.[0]?.url) {
+            try { return await downloadImage(genData.data[0].url, 30000); } catch(e) { console.log("[FALLBACK DL FAIL] " + e.message); }
+          }
+        }
+      } catch(e) { console.log("[FALLBACK FAIL] " + e.message); }
+      // Fall back to CDN image from chat response (may be thumbnail)
       if (imageUrl) {
         try {
           return await downloadImage(imageUrl, 15000);
         } catch(e) { console.log("[IMG DL FAIL] " + e.message); }
       }
-      const genEndpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
-      const genRes = await fetch(genEndpoint, {
-        method: "POST",
-        headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, prompt: prompt + (size ? " (" + size + ")" : ""), n: 1, size: size || "1024x1024" })
-      });
-      const genText = await genRes.text();
-      if (!genRes.ok) throw httpError("API request failed", genRes.status);
-      let genData;
-      try { genData = JSON.parse(genText); } catch(e) { throw httpError("Invalid API response", 502); }
-      if (genData.data?.[0]?.b64_json) return { b64: genData.data[0].b64_json };
-      if (genData.data?.[0]?.url) {
-        try {
-          return await downloadImage(genData.data[0].url, 30000);
-        } catch(e) { console.log("[FALLBACK DL FAIL] " + e.message); }
-      }
-      throw httpError("No image in fallback response", 502);
+      throw httpError("No image in chat response", 502);
     }
     if (data.data?.[0]?.b64_json) return { b64: data.data[0].b64_json };
     if (data.data?.[0]?.url) {
