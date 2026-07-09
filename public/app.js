@@ -399,11 +399,13 @@ async function api(path, options = {}) {
   var hdrs = { "Content-Type": "application/json" };
   if (_csrfToken) hdrs["X-CSRF-Token"] = _csrfToken;
   if (options.headers) Object.assign(hdrs, options.headers);
-  const response = await fetch(path, {
-    credentials: "same-origin",
-    headers: hdrs,
-    ...options
-  });
+  var timeout = options.timeout || 120000;
+  var ctrl = new AbortController();
+  var t = setTimeout(function() { ctrl.abort(); }, timeout);
+  var fetchOpts = { credentials: "same-origin", headers: hdrs, signal: ctrl.signal };
+  Object.assign(fetchOpts, options);
+  delete fetchOpts.timeout;
+  const response = await fetch(path, fetchOpts).finally(function() { clearTimeout(t); });
   // Update CSRF token from response header if present
   var respCsrf = response.headers.get("X-CSRF-Token");
   if (respCsrf) _csrfToken = respCsrf;
@@ -970,6 +972,18 @@ async function loadHistory(before) {
 
 function renderHistory() {
   const loggedIn = !!state.user;
+
+  // Mark stale pending items as error (older than 2 minutes)
+  var now = Date.now();
+  state.history = state.history.map(function(item) {
+    if (item.status === "generating" && item.time) {
+      var age = now - new Date(item.time).getTime();
+      if (age > 120000) {
+        return { ...item, status: "error", error: "Request timed out" };
+      }
+    }
+    return item;
+  });
 
   // Show history section only when logged in
   if (elements.historySection) {
