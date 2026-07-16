@@ -29,9 +29,9 @@ async function api(path, opts = {}) {
 
 function esc(v = "") { return String(v).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;"); }
 
-function fmt(v) { if (!v) return ""; return new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(v)); }
+function fmt(v) { if (!v) return ""; return new Intl.DateTimeFormat("en-US", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }).format(new Date(v)); }
 
-function fmtFull(v) { if (!v) return ""; return new Intl.DateTimeFormat("en-US", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(v)); }
+function fmtFull(v) { if (!v) return ""; return new Intl.DateTimeFormat("en-US", { hour12: false, month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date(v)); }
 
 function toast(m) { let n = document.createElement("div"); n.className = "toast"; n.textContent = m; $("#toastLayer").appendChild(n); setTimeout(() => n.remove(), 2600); }
 
@@ -89,12 +89,10 @@ function renderAdmin() {
 
 async function loadPanel() {
   if (state.view === "dashboard") {
-    var today = new Date();
-    var todayStr = today.getFullYear() + "-" + String(today.getMonth() + 1).padStart(2, "0") + "-" + String(today.getDate()).padStart(2, "0");
     let [settings, users, records] = await Promise.all([
       api("/api/admin/settings").catch(() => null),
       api("/api/admin/users").catch(() => ({ users: [] })),
-      api("/api/admin/generations?limit=20&from=" + todayStr).catch(() => ({ records: [] }))
+      api("/api/admin/generations?limit=20").catch(() => ({ records: [] }))
     ]);
     state.settings = settings;
     state.users = users.users || [];
@@ -621,7 +619,7 @@ function renderProviders() {
         provs.map((p, i) => `<div class="provider-card" data-index="${i}" draggable="true">
           <span class="provider-handle"><i class="ri-draggable"></i></span>
           <div class="provider-info">
-            <div class="provider-name">${esc(p.name || "Unnamed")} <span style="font-size:11px;color:var(--ink-dim);font-weight:400">${esc(p.type || "openai")}</span></div>
+            <div class="provider-name">${esc(p.name || "Unnamed")} <span style="font-size:11px;color:var(--ink-dim);font-weight:400">${esc(p.preset || "openai")}</span></div>
             <div class="provider-detail">${esc(p.baseUrl || "-")} · ${esc(p.model || "default")} ${p.enabled === false ? '· <span style="color:var(--red)">disabled</span>' : ""}</div>
           </div>
           <button class="provider-toggle ${p.enabled !== false ? "enabled" : ""}" data-index="${i}" data-action="toggle" title="Toggle"><i class="ri-power-line"></i></button>
@@ -659,7 +657,7 @@ function renderProviders() {
           apiKey: "",
           baseUrl: s.apiBaseUrl || "",
           model: s.model || "",
-          type: "chat",
+          preset: "chat",
           enabled: true
         });
         saveProviders(true);
@@ -697,25 +695,41 @@ function initProviderDrag() {
 }
 
 function editProvider(idx) {
-  let p = (idx !== undefined && idx >= 0) ? state.providers[idx] : { id: "", name: "", apiKey: "", baseUrl: "", model: "", type: "openai", enabled: true };
+  let p = (idx !== undefined && idx >= 0) ? state.providers[idx] : { name: "", apiKey: "", baseUrl: "", model: "", preset: "openai", enabled: true };
   let isNew = idx === undefined || idx < 0;
-  let apiKeyPlaceholder = p.apiKey ? "Leave empty to keep current" : "API key";
+  let apiKeyMask = p.apiKey ? p.apiKey.slice(0, 7) + "****" + p.apiKey.slice(-4) : "";
   modal(`
-    <h2>${isNew ? "Add" : "Edit"} Provider</h2>
+    <h2 style="margin-bottom:20px">${isNew ? "Add" : "Edit"} Provider</h2>
     <form id="providerForm" class="form">
-      <label>Name <input id="pName" value="${esc(p.name)}" placeholder="e.g. OpenAI, Anthropic" required></label>
-      <label>ID <input id="pId" value="${esc(p.id)}" placeholder="e.g. openai, anthropic" ${isNew ? "" : "readonly"} required></label>
-      <label>API Key <input id="pKey" type="password" value="" placeholder="${apiKeyPlaceholder}"></label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <label>Name <input id="pName" value="${esc(p.name)}" placeholder="e.g. OpenAI" required></label>
+        <label>Preset
+          <select id="pPreset">
+            <option value="openai" ${p.preset === "openai" ? "selected" : ""}>OpenAI Standard</option>
+            <option value="chat" ${p.preset === "chat" ? "selected" : ""}>Chat Completion</option>
+            <option value="google" ${p.preset === "google" ? "selected" : ""}>Google AI Studio</option>
+            <option value="evolink" ${p.preset === "evolink" ? "selected" : ""}>Evolink Async</option>
+            <option value="custom" ${p.preset === "custom" ? "selected" : ""}>Custom Settings...</option>
+          </select>
+        </label>
+      </div>
+      <label>API Key <input id="pKey" type="text" value="${esc(apiKeyMask || "")}" placeholder="API key"></label>
       <label>Base URL <input id="pBaseUrl" value="${esc(p.baseUrl || "")}" placeholder="https://api.openai.com/v1"></label>
-      <label>Model <input id="pModel" value="${esc(p.model || "")}" placeholder="e.g. gpt-4o, gemini-3.1-flash-image"></label>
-      <label>API Format
-        <select id="pType">
-          <option value="openai" ${p.type === "openai" ? "selected" : ""}>OpenAI-compatible (images/generations)</option>
-          <option value="chat" ${p.type === "chat" ? "selected" : ""}>Chat-compatible (chat/completions)</option>
-        </select>
-      </label>
-      <label class="checkbox-label"><input id="pEnabled" type="checkbox" ${p.enabled !== false ? "checked" : ""}> Enabled</label>
-      <div style="display:flex;gap:8px;margin-top:4px">
+      <label>Model <input id="pModel" value="${esc(p.model || "")}" placeholder="e.g. gpt-4o"></label>
+      
+      <div id="customFields" style="display:${p.preset === "custom" ? "block" : "none"};border:1px dashed var(--line);padding:12px;border-radius:8px;margin-top:12px">
+        <div style="font-weight:600;font-size:12px;margin-bottom:8px;color:var(--accent)">Custom Configuration</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <label>API Format <select id="pCustomFormat"><option value="images" ${p.customApiFormat === "images" ? "selected" : ""}>Images API</option><option value="chat" ${p.customApiFormat === "chat" ? "selected" : ""}>Chat API</option></select></label>
+          <label>Size Format <select id="pCustomSize"><option value="pixel" ${p.customSizeFormat === "pixel" ? "selected" : ""}>Pixels (1024x1024)</option><option value="ratio" ${p.customSizeFormat === "ratio" ? "selected" : ""}>Ratio (1:1)</option></select></label>
+        </div>
+        <label style="margin-top:8px">Reference Field Name <input id="pCustomRef" value="${esc(p.customRefField || "image_prompts")}" placeholder="e.g. image_urls, none"></label>
+        <label style="margin-top:8px;display:flex;align-items:center;gap:8px;cursor:pointer"><input id="pCustomAsync" type="checkbox" ${p.customAsync ? "checked" : ""} style="width:auto"> Enable Async Polling</label>
+        <label style="margin-top:8px">Poll URL (use {{task_id}}) <input id="pCustomPoll" value="${esc(p.customPollUrl || "")}" placeholder="/v1/tasks/{{task_id}}"></label>
+      </div>
+
+      <label class="checkbox-label" style="margin-top:12px"><input id="pEnabled" type="checkbox" ${p.enabled !== false ? "checked" : ""}> Enabled</label>
+      <div style="display:flex;gap:8px;margin-top:16px">
         <button class="btn btn-primary" type="submit"><i class="ri-save-line"></i> ${isNew ? "Add" : "Save"}</button>
         <button class="btn" type="button" id="testProviderBtn"><i class="ri-test-tube-line"></i> Test</button>
         <button class="btn" type="button" id="cancelModalBtn">Cancel</button>
@@ -723,45 +737,42 @@ function editProvider(idx) {
       <div id="testResult" style="font-size:13px;margin-top:8px"></div>
     </form>`);
   setTimeout(() => {
-    $("#providerForm").addEventListener("submit", function(e) {
+    $("#pPreset").onchange = function() {
+      $("#customFields").style.display = this.value === "custom" ? "block" : "none";
+    };
+    $("#providerForm").onsubmit = function(e) {
       e.preventDefault();
       let prov = {
-        id: $("#pId").value.trim(),
         name: $("#pName").value.trim(),
-        apiKey: ($("#pKey").value.trim()) || p.apiKey || "",
+        apiKey: ($("#pKey").value.trim().includes("****") ? p.apiKey : $("#pKey").value.trim()) || "",
         baseUrl: $("#pBaseUrl").value.trim(),
         model: $("#pModel").value.trim(),
-        type: $("#pType").value,
-        enabled: $("#pEnabled").checked
+        preset: $("#pPreset").value,
+        enabled: $("#pEnabled").checked,
+        customApiFormat: $("#pCustomFormat").value,
+        customSizeFormat: $("#pCustomSize").value,
+        customRefField: $("#pCustomRef").value.trim(),
+        customAsync: $("#pCustomAsync").checked,
+        customPollUrl: $("#pCustomPoll").value.trim()
       };
-      if (!prov.id || !prov.name) { toast("Name and ID are required"); return; }
       if (isNew) state.providers.push(prov);
       else state.providers[idx] = prov;
       closeModal();
       saveProviders(true);
-    });
+    };
     $("#testProviderBtn").onclick = async function() {
-      let testResult = $("#testResult");
-      testResult.innerHTML = '<span style="color:var(--amber)">Testing...</span>';
-      let apiKey = $("#pKey").value.trim() || p.apiKey || "";
+      let tr = $("#testResult");
+      tr.innerHTML = '<span style="color:var(--amber)">Testing...</span>';
+      let apiKey = $("#pKey").value.trim().includes("****") ? p.apiKey : $("#pKey").value.trim();
       let baseUrl = $("#pBaseUrl").value.trim();
       let model = $("#pModel").value.trim() || "gpt-4o";
-      if (!apiKey || !baseUrl) { testResult.innerHTML = '<span style="color:var(--red)">API Key and Base URL required</span>'; return; }
+      let preset = $("#pPreset").value;
+      if (!baseUrl || !apiKey) { tr.innerHTML = '<span style="color:var(--red)">Key and URL required</span>'; return; }
       try {
-        let endpoint = baseUrl.endsWith("/v1") ? baseUrl + "/chat/completions" : baseUrl + "/v1/chat/completions";
-        let resp = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Authorization": "Bearer " + apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ model, messages: [{ role: "user", content: "test" }], max_tokens: 5 })
-        });
-        if (resp.ok) testResult.innerHTML = '<span style="color:var(--green)">Connection successful ✓</span>';
-        else {
-          let txt = await resp.text();
-          testResult.innerHTML = '<span style="color:var(--red)">Error: ' + esc((resp.status) + " - " + txt.slice(0, 100)) + '</span>';
-        }
-      } catch (err) {
-        testResult.innerHTML = '<span style="color:var(--red)">Connection failed: ' + esc(err.message) + '</span>';
-      }
+        let d = await api("/api/admin/providers/test", { method: "POST", body: JSON.stringify({ apiKey, baseUrl, model, preset, name: p.name }) });
+        if (d.success) tr.innerHTML = '<span style="color:var(--green)">Success ✓</span>';
+        else tr.innerHTML = '<span style="color:var(--red)">' + esc(d.error || "Fail") + '</span>';
+      } catch (err) { tr.innerHTML = '<span style="color:var(--red)">' + esc(err.message) + '</span>'; }
     };
     $("#cancelModalBtn").onclick = closeModal;
   }, 0);
@@ -775,7 +786,19 @@ function deleteProvider(idx) {
 
 async function saveProviders(silent) {
   try {
-    let provs = state.providers.map(p => ({ id: p.id, name: p.name, apiKey: p.apiKey || "", baseUrl: p.baseUrl || "", model: p.model || "", type: p.type || "openai", enabled: p.enabled !== false }));
+    let provs = state.providers.map(p => ({
+      name: p.name,
+      apiKey: p.apiKey || "",
+      baseUrl: p.baseUrl || "",
+      model: p.model || "",
+      preset: p.preset || "openai",
+      enabled: p.enabled !== false,
+      customApiFormat: p.customApiFormat || "images",
+      customSizeFormat: p.customSizeFormat || "pixel",
+      customRefField: p.customRefField || "image_prompts",
+      customAsync: Boolean(p.customAsync),
+      customPollUrl: p.customPollUrl || ""
+    }));
     state.settings = await api("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ providers: provs }) });
     state.providers = (state.settings && state.settings.providers) || [];
     if (!silent) toast("Providers saved");

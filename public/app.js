@@ -436,9 +436,12 @@ function escapeHtml(value = "") {
 function formatDate(value) {
   if (!value) return "";
   return new Intl.DateTimeFormat(state.lang === "zh" ? "zh-CN" : "en-US", {
+    hour12: false,
     year: "numeric",
     month: "2-digit",
-    day: "2-digit"
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit"
   }).format(new Date(value));
 }
 
@@ -547,7 +550,7 @@ function renderAll() {
         if (_fmt) [].slice.call(_fmt.options).forEach(function(o){o.hidden = !(_isAdmin||(_cfg.formatOptions||[]).includes(o.value));});
       });
     } catch(e) {}
-  }
+}
 
 function recentFallbackItems() {
   return getPromptSource().slice(0, 12).map((prompt, index) => ({
@@ -2321,7 +2324,7 @@ if (_sg) {
       if (typeof loadHistory === "function") await loadHistory();
       if (typeof renderHistory === "function") renderHistory();
     } catch(e) {}
-  };
+};
 }
 // Suppress "Cannot read" errors
 var _st = showToast;
