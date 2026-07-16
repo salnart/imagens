@@ -1,9 +1,10 @@
+name: imagens
+
 services:
   app:
+    network_mode: host
     build: .
-    container_name: gpt_image_studio_app
-    ports:
-      - "3000:3000"
+    container_name: imagens_app
     env_file: .env
     volumes:
       - ./public:/app/public
@@ -15,7 +16,8 @@ services:
 
   mysql:
     image: mysql:8.0
-    container_name: gpt_image_studio_mysql
+    container_name: imagens_mysql
+    network_mode: host
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}

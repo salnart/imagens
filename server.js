@@ -6,6 +6,50 @@ const fsSync = require("fs");
 const { promises: fs } = fsSync;
 
 const ROOT_DIR = __dirname;
+const LOG_DIR = path.join(ROOT_DIR, "log");
+
+function getWeekIdentifier() {
+  const d = new Date();
+  const day = d.getDay() || 7;
+  if (day !== 1) d.setDate(d.getDate() - (day - 1));
+  return d.toISOString().split("T")[0];
+}
+
+async function logApiInteraction(url, request, response) {
+  try {
+    if (!fsSync.existsSync(LOG_DIR)) await fs.mkdir(LOG_DIR, { recursive: true });
+    const file = path.join(LOG_DIR, `api-${getWeekIdentifier()}.log`);
+    const entry = JSON.stringify({
+      timestamp: new Date().toISOString(),
+      url,
+      request,
+      response
+    }) + "\n";
+    fsSync.appendFileSync(file, entry);
+  } catch (e) {
+    console.error("[LOGGER ERROR]", e.message);
+  }
+}
+
+async function cleanOldLogs() {
+  try {
+    if (!fsSync.existsSync(LOG_DIR)) return;
+    const files = await fs.readdir(LOG_DIR);
+    const now = Date.now();
+    const threeMonthsMs = 90 * 24 * 60 * 60 * 1000;
+    for (const file of files) {
+      if (!file.endsWith(".log")) continue;
+      const filePath = path.join(LOG_DIR, file);
+      const stats = await fs.stat(filePath);
+      if (now - stats.mtime.getTime() > threeMonthsMs) {
+        await fs.unlink(filePath);
+        console.log("[LOGGER] Deleted old log:", file);
+      }
+    }
+  } catch (e) {
+    console.error("[LOGGER CLEANUP ERROR]", e.message);
+  }
+}
 
 function loadEnvFile(filePath) {
   if (!fsSync.existsSync(filePath)) return;
@@ -258,25 +302,25 @@ function serializeUser(user) {
   };
 }
 
-function getOpenAIApiKey(settings) {
-  return settings.openaiApiKey || process.env.AI_API_KEY || process.env.OPENAI_API_KEY || "";
-}
-
-function getOpenAIBaseUrl(settings = {}) {
-  return String(settings.apiBaseUrl || process.env.AI_API_BASE_URL || process.env.OPENAI_BASE_URL || "").trim().replace(/\/+$/, "");
-}
-
-function getChatCompletionsEndpoint(settings = {}) {
-  const cleanBase = getOpenAIBaseUrl(settings);
-  if (!cleanBase) throw httpError("AI API base URL is not configured", 400);
-  if (cleanBase.endsWith("/chat/completions")) return cleanBase;
-  if (cleanBase.endsWith("/v1")) return `${cleanBase}/chat/completions`;
-  return `${cleanBase}/v1/chat/completions`;
-}
+// These functions are deprecated and will be removed.
+// function getOpenAIApiKey(settings) {
+//   return settings.openaiApiKey || process.env.AI_API_KEY || process.env.OPENAI_API_KEY || "";
+// }
+// function getOpenAIBaseUrl(settings = {}) {
+//   return String(settings.apiBaseUrl || process.env.AI_API_BASE_URL || process.env.OPENAI_BASE_URL || "").trim().replace(/\/+$/, "");
+// }
+// function getChatCompletionsEndpoint(settings = {}) {
+//   const cleanBase = getOpenAIBaseUrl(settings);
+//   if (!cleanBase) throw httpError("AI API base URL is not configured", 400);
+//   if (cleanBase.endsWith("/chat/completions")) return cleanBase;
+//   if (cleanBase.endsWith("/v1")) return `${cleanBase}/chat/completions`;
+//   return `${cleanBase}/v1/chat/completions`;
+// }
 
 function publicSettings(settings) {
+  const hasProviderKey = (settings.providers || []).some(p => p && p.apiKey && p.enabled !== false);
   return {
-    hasApiKey: Boolean(getOpenAIApiKey(settings) && getOpenAIBaseUrl(settings)),
+    hasApiKey: hasProviderKey,
     model: GEMINI_MODEL,
     allowRegistration: Boolean(settings.allowRegistration),
     requireApproval: Boolean(settings.requireApproval),
@@ -285,18 +329,15 @@ function publicSettings(settings) {
     checkinCredit: CHECKIN_CREDIT,
     maxImagesPerRequest: Number(settings.maxImagesPerRequest || 1),
     uiConfig: settings.uiConfig || "",
-    providers: (settings.providers || []).map(function(p) { return { id: p.id, name: p.name, baseUrl: p.baseUrl, model: p.model, type: p.type || "openai", enabled: p.enabled !== false }; }),
+    providers: (settings.providers || []).map(p => ({ name: p.name, preset: p.preset || "openai" })),
     unlimitedGlobal: Boolean(settings.unlimitedGlobal)
   };
 }
 
 function adminSettings(settings) {
-  const key = getOpenAIApiKey(settings);
   return {
     ...publicSettings(settings),
-    providers: settings.providers || [],
-    apiBaseUrl: getOpenAIBaseUrl(settings),
-    apiKeyMask: key ? `${key.slice(0, 7)}...${key.slice(-4)}` : "",
+    providers: (settings.providers || []).map(p => ({ ...p, apiKey: p.apiKey ? `${p.apiKey.slice(0, 7)}...${p.apiKey.slice(-4)}` : "" })),
     uiConfig: settings.uiConfig || ""
   };
 }
@@ -488,88 +529,128 @@ async function downloadImage(url, timeoutMs = 15000) {
 }
 
 async function callGemini(settings, prompt, references, size, n = 1) {
-  const fetchWithKey = async (apiKey, base, model, prompt, references, size, providerType) => {
-    providerType = providerType || (model.includes("gemini") ? "chat" : "openai");
-    const chatEndpoint = base.endsWith("/v1") ? base + "/chat/completions" : base + "/v1/chat/completions";
-    let payload, endpoint;
-    if (providerType === "chat") {
-      const c = [{ type: "text", text: prompt + (size ? " (" + size + ")" : "") }];
+  const fetchWithKey = async (provider, prompt, references, size) => {
+    const { apiKey, baseUrl: base, model, preset } = provider;
+    const isEvolink = preset === "evolink";
+    const isChat = preset === "chat" || preset === "google";
+    const isCustom = preset === "custom";
+
+    let endpoint, payload;
+    let sizeParam = size || "1024x1024";
+
+    if (isChat || (isCustom && provider.customApiFormat === "chat")) {
+      if (base.endsWith("/chat/completions") || base.endsWith("/chat/completions/")) {
+        endpoint = base;
+      } else {
+        endpoint = base.endsWith("/v1") ? base + "/chat/completions" : base + "/v1/chat/completions";
+      }
+      const content = [{ type: "text", text: prompt + (size ? " (" + size + ")" : "") }];
       if (references && Array.isArray(references)) {
         for (const ref of references) {
           const s = String(ref || "");
           if (s.startsWith("data:image/") || s.startsWith("http")) {
-            c.push({ type: "image_url", image_url: { url: s } });
+            content.push({ type: "image_url", image_url: { url: s } });
           }
         }
       }
-      endpoint = chatEndpoint;
-      payload = { model, messages: [{ role: "user", content: c }], max_tokens: 4096 };
+      payload = { model, messages: [{ role: "user", content }], max_tokens: 4096 };
     } else {
-      endpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
-      payload = { model, prompt, n: 1, size: size || "1024x1024" };
+      if (base.endsWith("/images/generations") || base.endsWith("/images/generations/")) {
+        endpoint = base;
+      } else {
+        endpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
+      }
+      if (isEvolink || (isCustom && provider.customSizeFormat === "ratio")) {
+        const sizeMap = { "1024x1024":"1:1", "1024x1536":"2:3", "1536x1024":"3:2", "768x1024":"3:4", "1024x768":"4:3", "2048x2048":"1:1", "2048x3072":"2:3", "3072x2048":"3:2", "2880x3840":"3:4", "3840x2880":"4:3", "512x512":"1:1" };
+        sizeParam = sizeMap[size] || "auto";
+      }
+      payload = { model, prompt, n: 1, size: sizeParam };
       if (references && Array.isArray(references) && references.length > 0) {
-        payload.image_prompts = references;
+        const refField = isEvolink ? "image_urls" : (isCustom ? (provider.customRefField || "image_prompts") : "image_prompts");
+        if (refField !== "none") payload[refField] = references;
       }
     }
+
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
+    
     const text = await response.text();
+    await logApiInteraction(endpoint, payload, text);
+
     if (!response.ok) {
-      let errMsg = "API request failed";
-      try { const err = JSON.parse(text); errMsg = err.error?.message || errMsg; } catch(e) {}
-      throw httpError(errMsg, response.status);
+      let msg = "API request failed";
+      try { const err = JSON.parse(text); msg = err.error?.message || msg; } catch(e) {}
+      throw httpError(msg, response.status);
     }
+
     let data;
     try { data = JSON.parse(text); } catch(e) { throw httpError("Invalid API response", 502); }
-    if (providerType === "chat") {
+
+    if ((isEvolink || (isCustom && provider.customAsync)) && data.id && (data.status === "pending" || data.status === "processing")) {
+      const taskId = data.id;
+      let cleanBase = base.replace(/\/+$/, "");
+      cleanBase = cleanBase.replace(/\/images\/generations$/, "").replace(/\/chat\/completions$/, "");
+      if (cleanBase.endsWith("/v1")) cleanBase = cleanBase.slice(0, -3);
+      const pollUrl = isCustom && provider.customPollUrl ? provider.customPollUrl.replace("{{task_id}}", taskId) : (cleanBase + "/v1/tasks/" + taskId);
+      
+      let attempts = 0;
+      while (attempts < 30) {
+        await new Promise(r => setTimeout(r, 2000));
+        attempts++;
+        const pollResp = await fetch(pollUrl, { method: "GET", headers: { Authorization: "Bearer " + apiKey } });
+        const pollText = await pollResp.text();
+        if (!pollResp.ok) throw httpError("Task poll failed: " + pollResp.statusText, pollResp.status);
+        const pollData = JSON.parse(pollText);
+        if (pollData.status === "completed") {
+          data = { data: (pollData.results || []).map(url => ({ url })) };
+          break;
+        } else if (pollData.status === "failed") {
+          throw httpError("Task failed: " + (pollData.error?.message || "Unknown error"), 502);
+        }
+      }
+      if (attempts >= 30) throw httpError("Task polling timed out", 504);
+    }
+
+    if (isChat || (isCustom && provider.customApiFormat === "chat")) {
       const msgContent = data.choices?.[0]?.message?.content || "";
       const imageUrl = extractImageUrl(msgContent);
-      // Try /images/generations first (returns full resolution)
-      const genEndpoint = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
-      try {
-        const genRes = await fetch(genEndpoint, {
-          method: "POST",
-          headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" },
-          body: JSON.stringify({ model, prompt: prompt + (size ? " (" + size + ")" : ""), n: 1, size: size || "1024x1024" })
-        });
-        const genText = await genRes.text();
-        if (genRes.ok) {
-          let genData;
-          try { genData = JSON.parse(genText); } catch(e) {}
-          if (genData?.data?.[0]?.b64_json) return { b64: genData.data[0].b64_json };
-          if (genData?.data?.[0]?.url) {
-            try { return await downloadImage(genData.data[0].url, 30000); } catch(e) { console.log("[FALLBACK DL FAIL] " + e.message); }
-          }
-        }
-      } catch(e) { console.log("[FALLBACK FAIL] " + e.message); }
-      // Fall back to CDN image from chat response (may be thumbnail)
       if (imageUrl) {
         try {
           return await downloadImage(imageUrl, 15000);
         } catch(e) { console.log("[IMG DL FAIL] " + e.message); }
       }
-      throw httpError("No image in chat response", 502);
-    }
-    if (data.data?.[0]?.b64_json) return { b64: data.data[0].b64_json };
-    if (data.data?.[0]?.url) {
+      const genUrl = (base.endsWith("/v1") ? base : base + "/v1") + "/images/generations";
       try {
-        return await downloadImage(data.data[0].url, 30000);
-      } catch(e) { console.log("[IMG DL FAIL] " + e.message); throw httpError("Image download failed", 502); }
+        const gRes = await fetch(genUrl, { method: "POST", headers: { Authorization: "Bearer " + apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ model, prompt: prompt + (size ? " (" + size + ")" : ""), n: 1, size: sizeParam }) });
+        const gText = await gRes.text();
+        if (gRes.ok) {
+          const gData = JSON.parse(gText);
+          if (gData.data?.[0]?.b64_json) return { b64: gData.data[0].b64_json };
+          if (gData.data?.[0]?.url) return await downloadImage(gData.data[0].url, 30000);
+        }
+      } catch(e) {}
+      throw httpError("No image in response", 502);
     }
+
+    if (data.data?.[0]?.b64_json) return { b64: data.data[0].b64_json };
+    if (data.data?.[0]?.url) return await downloadImage(data.data[0].url, 30000);
     throw httpError("No image in API response", 502);
   };
 
+  let usedProviderName = "default";
   const fetchWithFailover = async () => {
     const providers = (settings.providers || []).filter(p => p && p.apiKey && p.enabled !== false);
     if (providers.length > 0) {
       let lastError;
       for (const p of providers) {
         try {
-          console.log("[PROVIDER] trying " + p.name + " (" + p.id + ") type=" + (p.type || "openai"));
-          return await fetchWithKey(p.apiKey, p.baseUrl, p.model || GEMINI_MODEL, prompt, references, size, p.type);
+          console.log("[PROVIDER] trying " + p.name + " preset=" + (p.preset || "openai"));
+          const result = await fetchWithKey(p, prompt, references, size);
+          usedProviderName = p.name;
+          return result;
         } catch (err) {
           console.log("[PROVIDER FAIL] " + p.name + ": " + err.message);
           lastError = err;
@@ -577,10 +658,7 @@ async function callGemini(settings, prompt, references, size, n = 1) {
       }
       throw lastError || httpError("All providers failed", 502);
     }
-    const apiKey = getOpenAIApiKey(settings);
-    if (!apiKey) throw httpError("API key is not configured", 400);
-    if (!getOpenAIBaseUrl(settings)) throw httpError("API base URL is not configured", 400);
-    return await fetchWithKey(apiKey, getOpenAIBaseUrl(settings), GEMINI_MODEL, prompt, references, size, "chat");
+    throw httpError("No AI providers configured. Add one in Admin > Providers", 400);
   };
 
   const requests = Array.from({ length: n }, () => fetchWithFailover());
@@ -590,8 +668,8 @@ async function callGemini(settings, prompt, references, size, n = 1) {
     if (!result || !result.b64) continue;
     items.push({ b64_json: result.b64, revised_prompt: prompt, extension: "png" });
   }
-  console.log("[GEMINI DONE] " + items.length + " images");
-  return { data: items };
+  console.log("[GEMINI DONE] " + items.length + " images provider=" + usedProviderName);
+  return { data: items, providerName: usedProviderName };
 }
 
 async function callOpenAIResponses(settings, payload) {
@@ -792,6 +870,7 @@ async function saveGeneratedImages(user, request, openaiResult) {
       isPublic: Boolean(request.isPublic),
       revisedPrompt: item.revised_prompt || "",
       usage: openaiResult.usage || item.usage || null,
+      refs: request.references || [],
       createdAt: nowIso()
     };
     saved.push({
@@ -953,11 +1032,30 @@ async function routeApi(req, res, url) {
     if (typeof body.allowRegistration === "boolean") patch.allowRegistration = body.allowRegistration ? 1 : 0;
     if (typeof body.requireApproval === "boolean") patch.requireApproval = body.requireApproval ? 1 : 0;
     if (Array.isArray(body.providers)) {
-      const validProviders = body.providers.filter(p => p && typeof p.id === "string" && typeof p.name === "string");
-      patch.providers = JSON.stringify(validProviders.map(p => ({
-        id: p.id, name: p.name, apiKey: p.apiKey || "", baseUrl: p.baseUrl || "",
-        model: p.model || "", type: p.type || "openai", enabled: p.enabled !== false
-      })));
+      const oldSettings = await store.getSettings();
+      const oldProviders = oldSettings.providers || [];
+      const validProviders = body.providers.filter(p => p && typeof p.name === "string" && p.name.trim());
+       patch.providers = JSON.stringify(validProviders.map(p => {
+        const pName = p.name.trim();
+        let keyToSave = (p.apiKey || "").trim();
+        if (keyToSave.includes("****") || keyToSave.includes("...")) {
+          const oldP = oldProviders.find(o => o.name === pName);
+          if (oldP) keyToSave = oldP.apiKey || "";
+        }
+        return {
+          name: pName,
+          apiKey: keyToSave,
+          baseUrl: String(p.baseUrl || "").trim(),
+          model: String(p.model || "").trim(),
+          preset: p.preset || "openai",
+          enabled: p.enabled !== false,
+          customApiFormat: p.customApiFormat || "images",
+          customSizeFormat: p.customSizeFormat || "pixel",
+          customRefField: p.customRefField || "image_prompts",
+          customAsync: Boolean(p.customAsync),
+          customPollUrl: p.customPollUrl || ""
+        };
+      }));
     }
     if (typeof body.unlimitedGlobal === "boolean") patch.unlimitedGlobal = body.unlimitedGlobal ? 1 : 0;
 
@@ -965,7 +1063,46 @@ async function routeApi(req, res, url) {
     return sendJson(res, 200, adminSettings(settings));
   }
 
-  
+  if (req.method === "POST" && url.pathname === "/api/admin/providers/test") {
+    const current = await getCurrentUser(req);
+    ensureAuthenticated(current);
+    ensureAdmin(current);
+    const body = await readJsonBody(req);
+    
+    // Use the full provider object from the request
+    const provider = {
+      apiKey: String(body.apiKey || "").trim(),
+      baseUrl: String(body.baseUrl || "").trim().replace(/\/+$/, ""),
+      model: String(body.model || "gpt-4o").trim(),
+      preset: String(body.preset || "openai").trim(),
+      name: String(body.name || "Test Provider").trim(),
+      // Include custom fields for a comprehensive test
+      customApiFormat: body.customApiFormat,
+      customSizeFormat: body.customSizeFormat,
+      customRefField: body.customRefField,
+      customAsync: body.customAsync,
+      customPollUrl: body.customPollUrl
+    };
+
+    if ((provider.apiKey.includes("****") || provider.apiKey.includes("...")) && provider.name) {
+      const oldSettings = await store.getSettings();
+      const oldP = (oldSettings.providers || []).find(o => o.name === provider.name);
+      if (oldP) provider.apiKey = oldP.apiKey || "";
+    }
+
+    if (!provider.apiKey || !provider.baseUrl) {
+      return sendJson(res, 200, { success: false, error: "API Key and Base URL required" });
+    }
+
+    try {
+      // Temporarily use callGemini's internal fetcher for a realistic test
+      await callGemini({ providers: [provider] }, "test", [], "1024x1024", 1);
+      return sendJson(res, 200, { success: true, message: "Connection successful" });
+    } catch (err) {
+      return sendJson(res, 200, { success: false, error: err.message.slice(0, 500) });
+    }
+  }
+
     if (req.method === "POST" && url.pathname === "/api/admin/users/create") {
       const current = await getCurrentUser(req);
       ensureAuthenticated(current);
@@ -1193,7 +1330,7 @@ async function routeApi(req, res, url) {
     try {
       const references = body.references || [];
       const geminiResult = await callGemini(settings, prompt, references, request.size, n);
-      const saved = await saveGeneratedImages(user, request, geminiResult);
+      const saved = await saveGeneratedImages(user, { ...request, references }, geminiResult);
       if (!saved.length) {
         throw httpError("API did not return a savable image", 502);
       }
@@ -1201,7 +1338,8 @@ async function routeApi(req, res, url) {
       await store.updateGenerationRequest(auditId, {
         status: "success",
         firstGenerationId: saved[0]?.id || "",
-        generationIds: saved.map((generation) => generation.id)
+        generationIds: saved.map((generation) => generation.id),
+        provider: geminiResult.providerName
       });
       reservedCredits = false;
       if (costPerImage > 0 && saved.length < n) {
